@@ -116,12 +116,10 @@ class RegionLoss(nn.Module):
         self.seen = 0
 
     def forward(self, output, target):
-
         device = None
         cuda_check = output.is_cuda
         if cuda_check:
             device = output.get_device()
-
 
         # output : BxAs*(4+1+num_classes)*H*W
         t0 = time.time()

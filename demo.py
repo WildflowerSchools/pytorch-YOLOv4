@@ -30,8 +30,6 @@ def detect_cv2(cfgfile, weightfile, imgfile, namesfile=None, cuda_device=torch.d
     m.load_weights(weightfile)
     print('Loading weights from %s... Done!' % (weightfile))
 
-    m.to(cuda_device)
-
     if namesfile is None:
         num_classes = m.num_classes
         if num_classes == 20:
