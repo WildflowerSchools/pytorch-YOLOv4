@@ -116,6 +116,13 @@ class RegionLoss(nn.Module):
         self.seen = 0
 
     def forward(self, output, target):
+
+        device = None
+        cuda_check = output.is_cuda
+        if cuda_check:
+            device = output.get_device()
+
+
         # output : BxAs*(4+1+num_classes)*H*W
         t0 = time.time()
         nB = output.data.size(0)
@@ -125,20 +132,20 @@ class RegionLoss(nn.Module):
         nW = output.data.size(3)
 
         output = output.view(nB, nA, (5 + nC), nH, nW)
-        x = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([0]))).view(nB, nA, nH, nW))
-        y = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([1]))).view(nB, nA, nH, nW))
-        w = output.index_select(2, Variable(torch.cuda.LongTensor([2]))).view(nB, nA, nH, nW)
-        h = output.index_select(2, Variable(torch.cuda.LongTensor([3]))).view(nB, nA, nH, nW)
-        conf = F.sigmoid(output.index_select(2, Variable(torch.cuda.LongTensor([4]))).view(nB, nA, nH, nW))
-        cls = output.index_select(2, Variable(torch.linspace(5, 5 + nC - 1, nC).long().cuda()))
+        x = F.sigmoid(output.index_select(2, Variable(torch.LongTensor([0], device=device))).view(nB, nA, nH, nW))
+        y = F.sigmoid(output.index_select(2, Variable(torch.LongTensor([1], device=device))).view(nB, nA, nH, nW))
+        w = output.index_select(2, Variable(torch.LongTensor([2], device=device))).view(nB, nA, nH, nW)
+        h = output.index_select(2, Variable(torch.LongTensor([3], device=device))).view(nB, nA, nH, nW)
+        conf = F.sigmoid(output.index_select(2, Variable(torch.LongTensor([4], device=device))).view(nB, nA, nH, nW))
+        cls = output.index_select(2, Variable(torch.linspace(5, 5 + nC - 1, nC).long().cuda(device=device)))
         cls = cls.view(nB * nA, nC, nH * nW).transpose(1, 2).contiguous().view(nB * nA * nH * nW, nC)
         t1 = time.time()
 
-        pred_boxes = torch.cuda.FloatTensor(4, nB * nA * nH * nW)
-        grid_x = torch.linspace(0, nW - 1, nW).repeat(nH, 1).repeat(nB * nA, 1, 1).view(nB * nA * nH * nW).cuda()
-        grid_y = torch.linspace(0, nH - 1, nH).repeat(nW, 1).t().repeat(nB * nA, 1, 1).view(nB * nA * nH * nW).cuda()
-        anchor_w = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([0])).cuda()
-        anchor_h = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([1])).cuda()
+        pred_boxes = torch.FloatTensor(4, nB * nA * nH * nW, device=device)
+        grid_x = torch.linspace(0, nW - 1, nW).repeat(nH, 1).repeat(nB * nA, 1, 1).view(nB * nA * nH * nW).cuda(device=device)
+        grid_y = torch.linspace(0, nH - 1, nH).repeat(nW, 1).t().repeat(nB * nA, 1, 1).view(nB * nA * nH * nW).cuda(device=device)
+        anchor_w = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([0])).cuda(device=device)
+        anchor_h = torch.Tensor(self.anchors).view(nA, self.anchor_step).index_select(1, torch.LongTensor([1])).cuda(device=device)
         anchor_w = anchor_w.repeat(nB, 1).repeat(1, 1, nH * nW).view(nB * nA * nH * nW)
         anchor_h = anchor_h.repeat(nB, 1).repeat(1, 1, nH * nW).view(nB * nA * nH * nW)
         pred_boxes[0] = x.data + grid_x
@@ -151,7 +158,7 @@ class RegionLoss(nn.Module):
         nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx, ty, tw, th, tconf, tcls = build_targets(pred_boxes,
                                                                                                     target.data,
                                                                                                     self.anchors, nA,
-                                                                                                    nC, \
+                                                                                                    nC,
                                                                                                     nH, nW,
                                                                                                     self.noobject_scale,
                                                                                                     self.object_scale,
@@ -160,16 +167,16 @@ class RegionLoss(nn.Module):
         cls_mask = (cls_mask == 1)
         nProposals = int((conf > 0.25).sum().data[0])
 
-        tx = Variable(tx.cuda())
-        ty = Variable(ty.cuda())
-        tw = Variable(tw.cuda())
-        th = Variable(th.cuda())
-        tconf = Variable(tconf.cuda())
-        tcls = Variable(tcls.view(-1)[cls_mask].long().cuda())
+        tx = Variable(tx.cuda(device=device))
+        ty = Variable(ty.cuda(device=device))
+        tw = Variable(tw.cuda(device=device))
+        th = Variable(th.cuda(device=device))
+        tconf = Variable(tconf.cuda(device=device))
+        tcls = Variable(tcls.view(-1)[cls_mask].long().cuda(device=device))
 
-        coord_mask = Variable(coord_mask.cuda())
-        conf_mask = Variable(conf_mask.cuda().sqrt())
-        cls_mask = Variable(cls_mask.view(-1, 1).repeat(1, nC).cuda())
+        coord_mask = Variable(coord_mask.cuda(device=device))
+        conf_mask = Variable(conf_mask.cuda(device=device).sqrt())
+        cls_mask = Variable(cls_mask.view(-1, 1).repeat(1, nC).cuda(device=device))
         cls = cls[cls_mask].view(-1, nC)
 
         t3 = time.time()

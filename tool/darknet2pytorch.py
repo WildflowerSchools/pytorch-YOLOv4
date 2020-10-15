@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 from .region_loss import RegionLoss
 from .yolo_layer import YoloLayer
 from .config import *
@@ -124,10 +123,12 @@ class EmptyModule(nn.Module):
 
 # support route shortcut and reorg
 class Darknet(nn.Module):
-    def __init__(self, cfgfile, inference=False):
+    def __init__(self, cfgfile, inference=False, cuda_device=torch.device('cpu')):
         super(Darknet, self).__init__()
         self.inference = inference
         self.training = not self.inference
+
+        self.cuda_device = cuda_device
 
         self.blocks = parse_cfg(cfgfile)
         self.width = int(self.blocks[0]['width'])
@@ -264,6 +265,8 @@ class Darknet(nn.Module):
                     model.add_module('relu{0}'.format(conv_id), nn.ReLU(inplace=True))
                 elif activation == 'mish':
                     model.add_module('mish{0}'.format(conv_id), Mish())
+                elif activation == 'linear':
+                    pass
                 else:
                     print("convolutional conversion function doesn't handle activation module '{}'".format(activation))
 
@@ -374,7 +377,8 @@ class Darknet(nn.Module):
                 out_strides.append(prev_stride)
                 models.append(model)
             elif block['type'] == 'region':
-                loss = RegionLoss()
+                loss = RegionLoss(cuda_device=self.cuda_device)
+                loss.to(self.cuda_device)
                 anchors = block['anchors'].split(',')
                 loss.anchors = [float(i) for i in anchors]
                 loss.num_classes = int(block['classes'])
