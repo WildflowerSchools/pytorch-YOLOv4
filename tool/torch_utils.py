@@ -64,37 +64,37 @@ def convert2cpu_long(gpu_matrix):
     return torch.LongTensor(gpu_matrix.size()).copy_(gpu_matrix)
 
 
-def do_detect(model, img, conf_thresh, nms_thresh, cuda_device=torch.device('cpu'), profile=False):
-    with torch.cuda.device(cuda_device):
-        model.eval()
-        t0 = time.time()
+def do_detect(model, img, conf_thresh, nms_thresh, profile=False, use_cuda=False):
+    model.eval()
+    t0 = time.time()
 
-        if type(img) == np.ndarray and len(img.shape) == 3:  # cv2 image
-            img = torch.from_numpy(img.transpose(2, 0, 1)).float().div(255.0).unsqueeze(0)
-        elif type(img) == np.ndarray and len(img.shape) == 4:
-            img = torch.from_numpy(img.transpose(0, 3, 1, 2)).float().div(255.0)
-        elif type(img) == torch.Tensor and len(img.shape) == 3:
-            img = img.permute(2, 0, 1).float().div(255.0).unsqueeze(0)
-        elif type(img) == torch.Tensor and len(img.shape) == 4:
-            img = img.permute(0, 3, 1, 2).float().div(255.0)
-        else:
-            print("unknown image type")
-            exit(-1)
+    if type(img) == np.ndarray and len(img.shape) == 3:  # cv2 image
+        img = torch.from_numpy(img.transpose(2, 0, 1)).float().div(255.0).unsqueeze(0)
+    elif type(img) == np.ndarray and len(img.shape) == 4:
+        img = torch.from_numpy(img.transpose(0, 3, 1, 2)).float().div(255.0)
+    elif type(img) == torch.Tensor and len(img.shape) == 3:
+        img = img.permute(2, 0, 1).float().div(255.0).unsqueeze(0)
+    elif type(img) == torch.Tensor and len(img.shape) == 4:
+        img = img.permute(0, 3, 1, 2).float().div(255.0)
+    else:
+        print("unknown image type")
+        exit(-1)
 
-        img = img.to(cuda_device)
-        img = torch.autograd.Variable(img)
+    if use_cuda:
+        img = img.cuda()
 
-        t1 = time.time()
+    img = torch.autograd.Variable(img)
 
-        output = model(img)
+    t1 = time.time()
 
-        t2 = time.time()
+    output = model(img)
 
-        if profile:
-            print('-----------------------------------')
-            print('           Preprocess : %f' % (t1 - t0))
-            print('      Model Inference : %f' % (t2 - t1))
-            print('-----------------------------------')
+    t2 = time.time()
 
-        return post_processing(img, conf_thresh, nms_thresh, output, profile)
+    if profile:
+        print('-----------------------------------')
+        print('           Preprocess : %f' % (t1 - t0))
+        print('      Model Inference : %f' % (t2 - t1))
+        print('-----------------------------------')
 
+    return post_processing(img, conf_thresh, nms_thresh, output, profile)

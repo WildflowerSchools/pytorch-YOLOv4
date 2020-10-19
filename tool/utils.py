@@ -1,12 +1,40 @@
-import sys
+import contextlib
 import os
 import time
 import math
 import numpy as np
 
-import itertools
-import struct  # get_image_size
-import imghdr  # get_image_size
+
+@contextlib.contextmanager
+def gpus(device_ids=[-1]):
+    """
+    Temporarily set the CUDA_VISIBLE_DEVICES environment variable.
+    This must be called before importing torch!
+
+    >>> with gpus("1,2"):
+    ...   "CUDA_VISIBLE_DEVICES" in os.environ
+    "1,2"
+
+    >>> "CUDA_VISIBLE_DEVICES" in os.environ
+    ""
+
+    :type environ: dict[str, unicode]
+    :param environ: Environment variables to set
+    """
+
+    old_device_ids = os.environ.get('CUDA_VISIBLE_DEVICES', None)
+
+    if isinstance(device_ids, list):
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(str(x) for x in device_ids)
+
+    try:
+        yield
+    finally:
+        if old_device_ids is None:
+            if 'CUDA_VISIBLE_DEVICES' in os.environ:
+                del os.environ['CUDA_VISIBLE_DEVICES']
+        else:
+            os.environ['CUDA_VISIBLE_DEVICES'] = old_device_ids
 
 
 def sigmoid(x):

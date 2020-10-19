@@ -123,9 +123,8 @@ class EmptyModule(nn.Module):
 
 # support route shortcut and reorg
 class Darknet(nn.Module):
-    def __init__(self, cfgfile, inference=False, cuda_device=torch.device('cpu')):
+    def __init__(self, cfgfile, inference=False, use_cuda=False):
         super(Darknet, self).__init__()
-        self.to(cuda_device)
 
         self.inference = inference
         self.training = not self.inference
@@ -145,6 +144,9 @@ class Darknet(nn.Module):
 
         self.header = torch.IntTensor([0, 0, 0, 0])
         self.seen = 0
+
+        if use_cuda:
+            self.cuda()
 
     def forward(self, x):
         ind = -2
